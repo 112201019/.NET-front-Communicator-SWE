@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36414.22 d17.14
+VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CentralGui", "CentralGui\CentralGui.csproj", "{38631FA6-12C7-4E6A-ABCD-E237449065D8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ViewModel", "ViewModel\ViewModel.csproj", "{E4ED584C-A4EC-46BC-A0AB-5BE8963F8D54}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CanvasDataModel", "Canvas\CanvasDataModel.csproj", "{51654BE5-0426-E495-D3E2-B5351AF854FD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{E4ED584C-A4EC-46BC-A0AB-5BE8963F8D54}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4ED584C-A4EC-46BC-A0AB-5BE8963F8D54}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E4ED584C-A4EC-46BC-A0AB-5BE8963F8D54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51654BE5-0426-E495-D3E2-B5351AF854FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51654BE5-0426-E495-D3E2-B5351AF854FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51654BE5-0426-E495-D3E2-B5351AF854FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51654BE5-0426-E495-D3E2-B5351AF854FD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
