@@ -1,8 +1,8 @@
-﻿namespace CanvasDataModel;
+﻿using System;
+using System.Collections.Generic;
 
-/// <summary>
-/// Internal node for the doubly-linked list, now holding a CanvasAction.
-/// </summary>
+namespace CanvasDataModel;
+
 public class ActionNode
 {
     public CanvasAction Action { get; }
@@ -15,22 +15,21 @@ public class ActionNode
     }
 }
 
-/// <summary>
-/// Manages the undo/redo stack using a list of actions (Command Pattern).
-/// </summary>
+public class SerializedActionStack
+{
+    public List<CanvasAction> AllActions { get; set; } = new();
+    public int CurrentIndex { get; set; } = -1;
+}
+
 public class StateManager
 {
     private ActionNode? _current;
-
-    // --- NEW: Added _initial to track the start ---
     private readonly ActionNode _initial;
 
     public StateManager()
     {
-        // --- MODIFIED ---
         _initial = new ActionNode(new CanvasAction(CanvasActionType.Initial, null, null));
         _current = _initial;
-        // --- END MODIFIED ---
     }
 
     public void AddAction(CanvasAction action)
@@ -68,24 +67,78 @@ public class StateManager
         return null;
     }
 
-    // --- NEW METHODS for Client ---
+    // --- NEW: PEEK METHODS FOR CLIENT PREDICTION ---
 
     /// <summary>
-    /// Peeks at the action that *would be undone*.
+    /// Returns the action that *would* be undone if Undo() was called, 
+    /// without changing the state.
     /// </summary>
     public CanvasAction? PeekUndo()
     {
-        return _current?.Action;
+        if (_current?.Prev != null)
+        {
+            return _current.Action;
+        }
+        return null;
     }
 
     /// <summary>
-    /// Peeks at the action that *would be redone*.
+    /// Returns the action that *would* be redone if Redo() was called,
+    /// without changing the state.
     /// </summary>
     public CanvasAction? PeekRedo()
     {
-        return _current?.Next?.Action;
+        if (_current?.Next != null)
+        {
+            return _current.Next.Action;
+        }
+        return null;
     }
     // --- END NEW ---
 
     public CanvasAction? CurrentAction => _current?.Action;
+
+    public SerializedActionStack ExportState()
+    {
+        var dto = new SerializedActionStack();
+        ActionNode? node = _initial;
+        int index = 0;
+
+        while (node != null)
+        {
+            dto.AllActions.Add(node.Action);
+            if (node == _current)
+            {
+                dto.CurrentIndex = index;
+            }
+            node = node.Next;
+            index++;
+        }
+        return dto;
+    }
+
+    public void ImportState(SerializedActionStack dto)
+    {
+        if (dto.AllActions.Count == 0 || dto.CurrentIndex == -1)
+        {
+            _current = _initial;
+            _initial.Next = null;
+            return;
+        }
+
+        _initial.Next = null;
+        _current = _initial;
+
+        ActionNode? targetCurrentNode = _initial;
+
+        for (int j = 1; j < dto.AllActions.Count; j++)
+        {
+            AddAction(dto.AllActions[j]);
+            if (j == dto.CurrentIndex)
+            {
+                targetCurrentNode = _current;
+            }
+        }
+        _current = targetCurrentNode;
+    }
 }

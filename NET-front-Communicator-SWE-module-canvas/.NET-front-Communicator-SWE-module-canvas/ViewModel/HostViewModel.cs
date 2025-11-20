@@ -1,220 +1,204 @@
 ﻿using System;
-using System.Diagnostics;
-using CanvasDataModel;
-// using CentralGui; // No longer needed
-using System.Linq;
 using System.Collections.Generic;
-
+using CanvasDataModel;
+using Microsoft.Win32;
 namespace ViewModel;
+using System.IO; // Still keep this
 
-public class HostViewModel : BaseCanvasViewModel
+public class HostViewModel : CanvasViewModel
 {
-    private readonly StateManager _hostActionManager = new();
-    private readonly string _hostId;
-    private readonly INetworkService _networkService; // <-- NEW
-
-    public override string CurrentUserId => _hostId;
-
-    // --- CONSTRUCTOR UPDATED ---
-    public HostViewModel(string hostId, INetworkService networkService)
+    private readonly string _myIp = "127.0.0.1";
+    private readonly List<string> _clientIps = new() { "192.168.1.50" };
+    private bool _suppressCommit = false;
+    // --- OVERRIDE TO TRUE ---
+    public override bool IsHost => true;
+    // ------------------------
+    public HostViewModel()
     {
-        _hostId = hostId;
-        _networkService = networkService;
-        // Subscribe to messages from the network
-        _networkService.MessageReceived += ProcessIncomingMessage;
+        CurrentUserId = "Host_Admin";
+        NetworkMock.Register(_myIp, ProcessIncomingMessage);
     }
-    // --- END UPDATE ---
 
-    /// <summary>
-    /// The Host's own local action (e.g., drawing) was finalized.
-    /// It validates it against its own state and broadcasts it.
-    /// </summary>
-    protected override void OnActionFinalized(CanvasAction action, MessageType msgType)
+    public override void CommitModification()
     {
-        bool isValid = true;
+        if (_suppressCommit) return;
+        base.CommitModification();
+    }
 
-        if (action.ActionType != CanvasActionType.Create)
+    protected override void ProcessAction(CanvasAction action)
+    {
+        if (action.ActionType == CanvasActionType.Modify && action.PrevShape != null)
         {
-            isValid = ValidateAction(action);
-        }
-
-        if (isValid)
-        {
-            Console.WriteLine($"[HOST] Host local action {action.ActionType} is valid.");
-            if (msgType == MessageType.NORMAL)
-            {
-                _hostActionManager.AddAction(action);
-            }
-            else if (msgType == MessageType.UNDO)
-            {
-                _hostActionManager.Undo();
-            }
-            else if (msgType == MessageType.REDO)
-            {
-                _hostActionManager.Redo();
-            }
-
-            ApplyActionToDictionary(action);
-
-            string actionJson = CanvasDataModelSerializer.SerializeActionManual(action);
-            var message = new NetworkMessage(CurrentUserId, msgType, actionJson);
-
-            // --- UPDATED CALL ---
-            _networkService.SendMessage(message); // On Host, SendMessage = Broadcast
-        }
-        else
-        {
-            Console.WriteLine($"[HOST] Host local action {action.ActionType} was INVALID. Reverting.");
-            if (action.PrevShape != null)
+            if (_shapes.ContainsKey(action.PrevShape.ShapeId))
             {
                 _shapes[action.PrevShape.ShapeId] = action.PrevShape;
-                SelectedShape = action.PrevShape;
+                if (SelectedShape != null && SelectedShape.ShapeId == action.PrevShape.ShapeId)
+                {
+                    _suppressCommit = true;
+                    try { base.SelectedShape = action.PrevShape; }
+                    finally { _suppressCommit = false; }
+                }
             }
         }
-    }
 
-    /// <summary>
-    /// Host's own Undo request.
-    /// </summary>
-    public override void OnUndoRequested()
-    {
-        CanvasAction? lastAction = _hostActionManager.PeekUndo();
-        if (lastAction == null || lastAction.ActionType == CanvasActionType.Initial) return;
-        CanvasAction? reverseAction = CreateReverseAction(lastAction, CurrentUserId);
-        if (reverseAction == null) return;
-        OnActionFinalized(reverseAction, MessageType.UNDO);
-    }
-
-    /// <summary>
-    /// Host's own Redo request.
-    /// </summary>
-    public override void OnRedoRequested()
-    {
-        CanvasAction? actionToRedo = _hostActionManager.PeekRedo();
-        if (actionToRedo == null) return;
-        CanvasAction? redoAction = CreateRedoAction(actionToRedo, CurrentUserId);
-        if (redoAction == null) return;
-        OnActionFinalized(redoAction, MessageType.REDO);
-    }
-
-    /// <summary>
-    /// Processes an incoming message from a Client.
-    /// </summary>
-    public override void ProcessIncomingMessage(NetworkMessage message)
-    {
-        CanvasAction? action = CanvasDataModelSerializer.DeserializeActionManual(message.SerializedAction);
-        if (action == null)
+        if (ValidateAction(action))
         {
-            Console.WriteLine("[HOST] Received invalid action. Ignoring.");
-            return;
-        }
-
-        bool isValid = ValidateAction(action);
-
-        if (isValid)
-        {
-            Console.WriteLine($"[HOST] Client {message.SenderId} action {action.ActionType} is VALID. Applying and broadcasting.");
-
-            if (message.MsgType == MessageType.NORMAL)
-            {
-                _hostActionManager.AddAction(action);
-            }
-            else if (message.MsgType == MessageType.UNDO)
-            {
-                _hostActionManager.Undo();
-            }
-            else if (message.MsgType == MessageType.REDO)
-            {
-                _hostActionManager.Redo();
-            }
-
-            ApplyActionToDictionary(action);
-
-            // --- UPDATED CALL ---
-            _networkService.SendMessage(message); // Broadcast the *original* valid message
+            ApplyActionLocally(action);
+            var msg = new NetworkMessage(NetworkMessageType.NORMAL, action);
+            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            NetworkMock.Broadcast(_clientIps, json);
         }
         else
         {
-            Console.WriteLine($"[HOST] Client {message.SenderId} action {action.ActionType} is INVALID. Ignoring.");
+            Console.WriteLine($"[Host] Local Action Rejected: {action.ActionType} on {action.NewShape?.ShapeId}");
+            RaiseRequestRedraw();
         }
     }
 
-    // ... (ValidateAction, ApplyActionToDictionary, CreateReverseAction, CreateRedoAction are all unchanged) ...
+    public override void Undo()
+    {
+        CommitModification();
+        SelectedShape = null;
+        CanvasAction? actionToUndo = _stateManager.PeekUndo();
+        base.Undo();
+
+        if (actionToUndo != null)
+        {
+            CanvasAction reverseAction = GetInverseAction(actionToUndo, CurrentUserId);
+            var msg = new NetworkMessage(NetworkMessageType.UNDO, reverseAction);
+            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            NetworkMock.Broadcast(_clientIps, json);
+        }
+    }
+
+    public override void Redo()
+    {
+        SelectedShape = null;
+        CanvasAction? actionToRedo = _stateManager.PeekRedo();
+        base.Redo();
+
+        if (actionToRedo != null)
+        {
+            var msg = new NetworkMessage(NetworkMessageType.REDO, actionToRedo);
+            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            NetworkMock.Broadcast(_clientIps, json);
+        }
+    }
+
+    //public void ProcessIncomingMessage(string json)
+    //{
+    //    NetworkMessage? msg = CanvasDataModelSerializer.DeserializeNetworkMessage(json);
+    //    if (msg == null) return;
+
+    //    CanvasAction action = msg.Action;
+
+    //    if (ValidateAction(action))
+    //    {
+    //        if (action.NewShape != null)
+    //        {
+    //            // KEY FIX: Use helper to sync dictionary and selection
+    //            UpdateShapeFromNetwork(action.NewShape);
+    //        }
+
+    //        RaiseRequestRedraw();
+    //        NetworkMock.Broadcast(_clientIps, json);
+    //    }
+    //    else
+    //    {
+    //        Console.WriteLine($"[Host] Validation Failed for Incoming Action: {action.ActionType}");
+    //    }
+    //}
+    // --- NEW: RESTORE FEATURE ---
+    // --- NEW: RESTORE FEATURE ---
+    public void RestoreShapes()
+    {
+        OpenFileDialog openDialog = new OpenFileDialog
+        {
+            Filter = "Canvas JSON (*.json)|*.json"
+        };
+
+        if (openDialog.ShowDialog() == true)
+        {
+            try
+            {
+                string json = File.ReadAllText(openDialog.FileName);
+
+                // 1. Apply Locally
+                ApplyRestore(json);
+
+                // 2. Broadcast RESTORE Message
+                var msg = new NetworkMessage(NetworkMessageType.RESTORE, null, json);
+                string networkJson = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+
+                Console.WriteLine("[Host] Broadcasting RESTORE command...");
+                NetworkMock.Broadcast(_clientIps, networkJson);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Host] Failed to restore: {ex.Message}");
+            }
+        }
+    }
+    // ----------------------------
+
+    public void ProcessIncomingMessage(string json)
+    {
+        NetworkMessage? msg = CanvasDataModelSerializer.DeserializeNetworkMessage(json);
+        if (msg == null) return;
+
+        // Host usually only receives its own broadcasts in this setup, or client actions
+        // Logic kept for Client Actions
+        if (msg.MessageType == NetworkMessageType.NORMAL || msg.MessageType == NetworkMessageType.UNDO || msg.MessageType == NetworkMessageType.REDO)
+        {
+            if (msg.Action != null)
+            {
+                CanvasAction action = msg.Action;
+                if (ValidateAction(action))
+                {
+                    if (action.NewShape != null) UpdateShapeFromNetwork(action.NewShape);
+                    RaiseRequestRedraw();
+                    NetworkMock.Broadcast(_clientIps, json);
+                }
+                else
+                {
+                    Console.WriteLine($"[Host] Validation Failed for Incoming Action: {action.ActionType}");
+                }
+            }
+        }
+        // Host ignores incoming RESTORE messages (it is the source)
+    }
     private bool ValidateAction(CanvasAction action)
     {
-        // CREATE actions are always valid
-        if (action.ActionType == CanvasActionType.Create)
+        string shapeId = action.NewShape?.ShapeId ?? action.PrevShape?.ShapeId ?? "";
+        if (string.IsNullOrEmpty(shapeId)) return false;
+
+        switch (action.ActionType)
         {
-            if (action.NewShape != null && _shapes.ContainsKey(action.NewShape.ShapeId))
-            {
-                Console.WriteLine($"[HOST VALIDATION] FAILED: Shape {action.NewShape.ShapeId} already exists.");
+            case CanvasActionType.Create:
+                return true;
+
+            case CanvasActionType.Delete:
+            case CanvasActionType.Modify:
+            case CanvasActionType.Resurrect:
+                if (!_shapes.ContainsKey(shapeId)) return false;
+
+                IShape currentHostShape = _shapes[shapeId];
+                IShape? incomingPrevShape = action.PrevShape;
+
+                if (incomingPrevShape == null) return false;
+
+                if (currentHostShape.ShapeId != incomingPrevShape.ShapeId) return false;
+
+                if (currentHostShape.LastModifiedBy != incomingPrevShape.LastModifiedBy)
+                {
+                    Console.WriteLine($"[Host] Version Mismatch! HostVer: {currentHostShape.LastModifiedBy}, IncomingVer: {incomingPrevShape.LastModifiedBy}");
+                    return false;
+                }
+
+                return true;
+
+            default:
                 return false;
-            }
-            return true;
         }
-        if (action.PrevShape == null)
-        {
-            Console.WriteLine("[HOST VALIDATION] FAILED: Action has no PrevShape.");
-            return false;
-        }
-        if (!_shapes.TryGetValue(action.PrevShape.ShapeId, out IShape? currentShape))
-        {
-            Console.WriteLine($"[HOST VALIDATION] FAILED: Shape {action.PrevShape.ShapeId} does not exist.");
-            return false;
-        }
-        string clientPrevShapeJson = CanvasDataModelSerializer.SerializeShapeManual(action.PrevShape);
-        string hostCurrentShapeJson = CanvasDataModelSerializer.SerializeShapeManual(currentShape);
-        if (clientPrevShapeJson == hostCurrentShapeJson)
-        {
-            return true;
-        }
-        else
-        {
-            Console.WriteLine("[HOST VALIDATION] FAILED: Client state mismatch (desync).");
-            Debug.WriteLine($"[HOST] Client's PrevShape:\n{clientPrevShapeJson}");
-            Debug.WriteLine($"[HOST] Host's CurrentShape:\n{hostCurrentShapeJson}");
-            return false;
-        }
-    }
-    private void ApplyActionToDictionary(CanvasAction action)
-    {
-        if (action.NewShape != null)
-        {
-            _shapes[action.NewShape.ShapeId] = action.NewShape;
-        }
-    }
-    private CanvasAction? CreateReverseAction(CanvasAction action, string userId)
-    {
-        if (action.ActionType == CanvasActionType.Create && action.NewShape != null)
-        {
-            IShape deletedShape = action.NewShape.WithDelete(userId);
-            return new CanvasAction(CanvasActionType.Delete, action.NewShape, deletedShape);
-        }
-        if (action.ActionType == CanvasActionType.Modify && action.PrevShape != null && action.NewShape != null)
-        {
-            IShape revertedShape = action.PrevShape.WithUpdates(null, null, userId);
-            return new CanvasAction(CanvasActionType.Modify, action.NewShape, revertedShape);
-        }
-        if (action.ActionType == CanvasActionType.Delete && action.PrevShape != null && action.NewShape != null)
-        {
-            IShape resurrectedShape = action.PrevShape.WithResurrect(userId);
-            return new CanvasAction(CanvasActionType.Resurrect, action.NewShape, resurrectedShape);
-        }
-        if (action.ActionType == CanvasActionType.Resurrect && action.PrevShape != null && action.NewShape != null)
-        {
-            IShape deletedShape = action.PrevShape.WithDelete(userId);
-            return new CanvasAction(CanvasActionType.Delete, action.NewShape, deletedShape);
-        }
-        return null;
-    }
-    private CanvasAction? CreateRedoAction(CanvasAction action, string userId)
-    {
-        if (action.NewShape != null)
-        {
-            IShape? prev = action.PrevShape?.WithUpdates(null, null, userId);
-            IShape? next = action.NewShape.WithUpdates(null, null, userId);
-            return new CanvasAction(action.ActionType, prev, next);
-        }
-        return null;
     }
 }

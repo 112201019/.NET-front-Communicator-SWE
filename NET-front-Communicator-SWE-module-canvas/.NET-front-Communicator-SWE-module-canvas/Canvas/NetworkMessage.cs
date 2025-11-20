@@ -1,39 +1,33 @@
-﻿using CanvasDataModel;
-using System;
+﻿namespace CanvasDataModel;
 
-namespace CanvasDataModel;
-
-public enum MessageType
-{
-    NORMAL, // For Create, Modify, Delete, Resurrect
-    UNDO,
-    REDO
-}
-
+/// <summary>
+/// Represents a C# object for a network message, which can be
+/// serialized for transmission.
+/// </summary>
 public class NetworkMessage
 {
     /// <summary>
-    /// The ID of the client who sent this message.
+    /// The type of message (e.g., NORMAL, UNDO, REDO, RESTORE).
     /// </summary>
-    public string SenderId { get; set; }
+    public NetworkMessageType MessageType { get; }
 
     /// <summary>
-    /// The type of message being sent.
+    /// The CanvasAction associated with this message (Optional for RESTORE).
     /// </summary>
-    public MessageType MsgType { get; set; }
+    public CanvasAction? Action { get; }
 
     /// <summary>
-    /// The JSON-serialized CanvasAction.
+    /// Optional payload string (e.g., JSON dictionary for RESTORE).
     /// </summary>
-    public string SerializedAction { get; set; }
+    public string? Payload { get; }
 
-    public NetworkMessage(string senderId, MessageType msgType, string serializedAction)
+    /// <summary>
+    /// Constructor for creating a new network message.
+    /// </summary>
+    public NetworkMessage(NetworkMessageType messageType, CanvasAction? action, string? payload = null)
     {
-        SenderId = senderId;
-        MsgType = msgType;
-        SerializedAction = serializedAction;
+        MessageType = messageType;
+        Action = action;
+        Payload = payload;
     }
-
-    // For deserialization
-    public NetworkMessage() { }
 }
