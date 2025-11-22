@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using CanvasDataModel;
+using Communicator.Canvas;
 using ViewModel;
 using System.Windows.Media.Imaging;
 using System.IO;
@@ -123,7 +123,10 @@ public partial class CanvasView : UserControl
             MessageBox.Show($"Failed to capture canvas for analysis: {ex.Message}");
         }
     }
-
+    private void BtnCloseAnalysis_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm != null) _vm.IsAnalysisVisible = false;
+    }
     private void SaveCanvasToPath(string filePath)
     {
         // Render the CanvasBorder 

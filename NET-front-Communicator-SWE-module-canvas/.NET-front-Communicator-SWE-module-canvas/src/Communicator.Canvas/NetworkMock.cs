@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
 public static class NetworkMock
 {

@@ -1,4 +1,4 @@
-﻿namespace CanvasDataModel;
+﻿namespace Communicator.Canvas;
 
 /// <summary>
 /// Defines the type of network message being sent.

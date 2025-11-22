@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using CanvasDataModel;
+using Communicator.Canvas;
 using Microsoft.Win32;
 namespace ViewModel;
 using System.IO; // Still keep this
@@ -49,7 +49,7 @@ public class HostViewModel : CanvasViewModel
         {
             ApplyActionLocally(action);
             var msg = new NetworkMessage(NetworkMessageType.NORMAL, action);
-            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            string json = CanvasSerializer.SerializeNetworkMessage(msg);
             NetworkMock.Broadcast(_clientIps, json);
         }
         else
@@ -70,7 +70,7 @@ public class HostViewModel : CanvasViewModel
         {
             CanvasAction reverseAction = GetInverseAction(actionToUndo, CurrentUserId);
             var msg = new NetworkMessage(NetworkMessageType.UNDO, reverseAction);
-            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            string json = CanvasSerializer.SerializeNetworkMessage(msg);
             NetworkMock.Broadcast(_clientIps, json);
         }
     }
@@ -84,14 +84,14 @@ public class HostViewModel : CanvasViewModel
         if (actionToRedo != null)
         {
             var msg = new NetworkMessage(NetworkMessageType.REDO, actionToRedo);
-            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            string json = CanvasSerializer.SerializeNetworkMessage(msg);
             NetworkMock.Broadcast(_clientIps, json);
         }
     }
 
     //public void ProcessIncomingMessage(string json)
     //{
-    //    NetworkMessage? msg = CanvasDataModelSerializer.DeserializeNetworkMessage(json);
+    //    NetworkMessage? msg = CanvasSerializer.DeserializeNetworkMessage(json);
     //    if (msg == null) return;
 
     //    CanvasAction action = msg.Action;
@@ -132,7 +132,7 @@ public class HostViewModel : CanvasViewModel
 
                 // 2. Broadcast RESTORE Message
                 var msg = new NetworkMessage(NetworkMessageType.RESTORE, null, json);
-                string networkJson = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+                string networkJson = CanvasSerializer.SerializeNetworkMessage(msg);
 
                 Console.WriteLine("[Host] Broadcasting RESTORE command...");
                 NetworkMock.Broadcast(_clientIps, networkJson);
@@ -147,7 +147,7 @@ public class HostViewModel : CanvasViewModel
 
     public void ProcessIncomingMessage(string json)
     {
-        NetworkMessage? msg = CanvasDataModelSerializer.DeserializeNetworkMessage(json);
+        NetworkMessage? msg = CanvasSerializer.DeserializeNetworkMessage(json);
         if (msg == null)
         {
             return;

@@ -2,7 +2,7 @@
 using System.IO;
 using System.Threading;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
 /// <summary>
 /// A mock service simulating external processing algorithms.

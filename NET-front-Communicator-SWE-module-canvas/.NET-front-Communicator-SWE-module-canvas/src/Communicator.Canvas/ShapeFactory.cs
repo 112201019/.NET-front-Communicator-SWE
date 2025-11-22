@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
 /// <summary>
 /// Implements the **Factory Method Pattern**.

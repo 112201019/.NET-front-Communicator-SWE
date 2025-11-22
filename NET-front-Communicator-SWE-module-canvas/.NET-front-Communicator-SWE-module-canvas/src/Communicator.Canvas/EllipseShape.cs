@@ -3,15 +3,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
-/// <summary>
-/// Represents a freehand drawing consisting of multiple connected points.
-/// </summary>
-public class FreeHand : IShape
+public class EllipseShape : IShape
 {
     public string ShapeId { get; }
-    public ShapeType Type => ShapeType.FREEHAND;
+    public ShapeType Type => ShapeType.ELLIPSE;
     public List<Point> Points { get; } = new();
     public Color Color { get; }
     public double Thickness { get; }
@@ -19,10 +16,7 @@ public class FreeHand : IShape
     public string LastModifiedBy { get; }
     public bool IsDeleted { get; }
 
-    /// <summary>
-    /// Primary constructor for new shape creation.
-    /// </summary>
-    public FreeHand(List<Point> points, Color color, double thickness, string createdByUserId)
+    public EllipseShape(List<Point> points, Color color, double thickness, string createdByUserId)
     {
         ShapeId = Guid.NewGuid().ToString();
         Points.AddRange(points);
@@ -33,10 +27,7 @@ public class FreeHand : IShape
         IsDeleted = false;
     }
 
-    /// <summary>
-    /// Constructor for deserialization and cloning (internal use).
-    /// </summary>
-    public FreeHand(string shapeId, List<Point> points, Color color, double thickness, string createdBy, string lastModifiedBy, bool isDeleted)
+    public EllipseShape(string shapeId, List<Point> points, Color color, double thickness, string createdBy, string lastModifiedBy, bool isDeleted)
     {
         ShapeId = shapeId;
         Points.AddRange(points);
@@ -47,11 +38,9 @@ public class FreeHand : IShape
         IsDeleted = isDeleted;
     }
 
-    // --- Prototype Pattern Implementation ---
-
     public IShape WithUpdates(Color? newColor, double? newThickness, string modifiedByUserId)
     {
-        return new FreeHand(this.ShapeId, this.Points, newColor ?? this.Color, newThickness ?? this.Thickness, this.CreatedBy, modifiedByUserId, this.IsDeleted);
+        return new EllipseShape(this.ShapeId, this.Points, newColor ?? this.Color, newThickness ?? this.Thickness, this.CreatedBy, modifiedByUserId, this.IsDeleted);
     }
 
     public IShape WithMove(Point offset, Rectangle canvasBounds, string modifiedByUserId)
@@ -64,8 +53,6 @@ public class FreeHand : IShape
 
         int newLeft = oldBounds.Left + offset.X;
         int newTop = oldBounds.Top + offset.Y;
-
-        // Clamp logic to keep shape inside bounds
         if (newLeft < canvasBounds.Left)
         {
             offset.X = canvasBounds.Left - oldBounds.Left;
@@ -87,29 +74,20 @@ public class FreeHand : IShape
         }
 
         List<Point> newPoints = new List<Point>();
-        foreach (Point p in this.Points)
-        {
-            newPoints.Add(new Point(p.X + offset.X, p.Y + offset.Y));
-        }
-
-        return new FreeHand(this.ShapeId, newPoints, this.Color, this.Thickness, this.CreatedBy, modifiedByUserId, this.IsDeleted);
+        foreach (Point p in this.Points) { newPoints.Add(new Point(p.X + offset.X, p.Y + offset.Y)); }
+        return new EllipseShape(this.ShapeId, newPoints, this.Color, this.Thickness, this.CreatedBy, modifiedByUserId, this.IsDeleted);
     }
 
     public IShape WithDelete(string modifiedByUserId)
     {
-        return new FreeHand(this.ShapeId, this.Points, this.Color, this.Thickness, this.CreatedBy, modifiedByUserId, true);
+        return new EllipseShape(this.ShapeId, this.Points, this.Color, this.Thickness, this.CreatedBy, modifiedByUserId, true);
     }
 
     public IShape WithResurrect(string modifiedByUserId)
     {
-        return new FreeHand(this.ShapeId, this.Points, this.Color, this.Thickness, this.CreatedBy, modifiedByUserId, false);
+        return new EllipseShape(this.ShapeId, this.Points, this.Color, this.Thickness, this.CreatedBy, modifiedByUserId, false);
     }
 
-    // --- Visitor Pattern Implementation ---
-
-    /// <summary>
-    /// Dispatches the call to the visitor's Visit(FreeHand) method.
-    /// </summary>
     public T Accept<T>(IShapeVisitor<T> visitor)
     {
         return visitor.Visit(this);
@@ -117,28 +95,39 @@ public class FreeHand : IShape
 
     public Rectangle GetBoundingBox()
     {
-        if (Points.Count == 0)
+        if (Points.Count < 2)
         {
             return new Rectangle(0, 0, 0, 0);
         }
 
-        int minX = Points.Min(p => p.X);
-        int minY = Points.Min(p => p.Y);
-        int maxX = Points.Max(p => p.X);
-        int maxY = Points.Max(p => p.Y);
-        return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+        int minX = Math.Min(Points[0].X, Points[1].X);
+        int minY = Math.Min(Points[0].Y, Points[1].Y);
+        int width = Math.Abs(Points[0].X - Points[1].X);
+        int height = Math.Abs(Points[0].Y - Points[1].Y);
+        return new Rectangle(minX, minY, width, height);
     }
 
     public bool IsHit(Point clickPoint)
     {
-        double tolerance = (Thickness / 2.0) + 2.0;
-        for (int i = 0; i < Points.Count - 1; i++)
+        if (Points.Count < 2)
         {
-            if (HitTestHelper.GetDistanceToLineSegment(clickPoint, Points[i], Points[i + 1]) <= tolerance)
-            {
-                return true;
-            }
+            return false;
         }
-        return false;
+
+        double centerX = (Points[0].X + Points[1].X) / 2.0;
+        double centerY = (Points[0].Y + Points[1].Y) / 2.0;
+        double radiusX = Math.Abs(Points[0].X - Points[1].X) / 2.0;
+        double radiusY = Math.Abs(Points[0].Y - Points[1].Y) / 2.0;
+        if (radiusX == 0 || radiusY == 0)
+        {
+            return false;
+        }
+
+        double tolerance = (Thickness / 2.0) + 2.0;
+        double valOuter = Math.Pow(clickPoint.X - centerX, 2) / Math.Pow(radiusX + tolerance, 2) +
+                          Math.Pow(clickPoint.Y - centerY, 2) / Math.Pow(radiusY + tolerance, 2);
+        double valInner = Math.Pow(clickPoint.X - centerX, 2) / Math.Pow(radiusX - tolerance, 2) +
+                          Math.Pow(clickPoint.Y - centerY, 2) / Math.Pow(radiusY - tolerance, 2);
+        return (valOuter <= 1.0 && valInner >= 1.0);
     }
 }

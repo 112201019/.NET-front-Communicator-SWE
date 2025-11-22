@@ -1,4 +1,4 @@
-﻿namespace CanvasDataModel;
+﻿namespace Communicator.Canvas;
 
 /// <summary>
 /// Represents a C# object for a network message, which can be

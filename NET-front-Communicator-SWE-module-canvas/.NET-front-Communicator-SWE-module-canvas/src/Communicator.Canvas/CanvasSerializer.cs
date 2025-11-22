@@ -7,13 +7,13 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
 /// <summary>
 /// Static utility class for manually serializing and deserializing IShape objects
 /// and CanvasAction objects to/from JSON strings and byte arrays.
 /// </summary>
-public static class CanvasDataModelSerializer
+public static class CanvasSerializer
 {
     // =========================================================================
     // Private Helpers

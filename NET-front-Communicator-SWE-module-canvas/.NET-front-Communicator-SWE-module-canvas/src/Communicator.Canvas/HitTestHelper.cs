@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 public class HitTestHelper
 {
     /// <summary>

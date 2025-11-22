@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
 /// <summary>
 /// Interface for the Visitor Design Pattern.

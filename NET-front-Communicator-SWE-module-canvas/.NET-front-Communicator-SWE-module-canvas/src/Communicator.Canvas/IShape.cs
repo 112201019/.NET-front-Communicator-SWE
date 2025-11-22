@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Drawing;
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
 /// <summary>
 /// Defines the contract for all geometric shapes on the canvas.

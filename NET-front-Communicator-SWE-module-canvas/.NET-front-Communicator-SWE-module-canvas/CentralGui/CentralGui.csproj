@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Canvas\CanvasDataModel.csproj" />
+    <ProjectReference Include="..\src\Communicator.Canvas\Communicator.Canvas.csproj" />
     <ProjectReference Include="..\ViewModel\ViewModel.csproj" />
   </ItemGroup>
 

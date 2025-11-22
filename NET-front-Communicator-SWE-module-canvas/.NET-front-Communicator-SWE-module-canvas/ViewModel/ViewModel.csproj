@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Canvas\CanvasDataModel.csproj" />
+        <ProjectReference Include="..\src\Communicator.Canvas\Communicator.Canvas.csproj" />
     </ItemGroup>
 
 </Project>

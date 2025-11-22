@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using CanvasDataModel;
+using Communicator.Canvas;
 using Microsoft.Win32;
 
 namespace ViewModel;
@@ -47,7 +47,7 @@ public class ClientViewModel : CanvasViewModel
         }
 
         var msg = new NetworkMessage(NetworkMessageType.NORMAL, action);
-        string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+        string json = CanvasSerializer.SerializeNetworkMessage(msg);
         NetworkMock.SendMessage(_hostIp, json);
         ShowGhostShape(action);
     }
@@ -62,7 +62,7 @@ public class ClientViewModel : CanvasViewModel
         {
             CanvasAction reverseAction = GetInverseAction(actionToUndo, CurrentUserId);
             var msg = new NetworkMessage(NetworkMessageType.UNDO, reverseAction);
-            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            string json = CanvasSerializer.SerializeNetworkMessage(msg);
             NetworkMock.SendMessage(_hostIp, json);
         }
     }
@@ -75,7 +75,7 @@ public class ClientViewModel : CanvasViewModel
         if (actionToRedo != null)
         {
             var msg = new NetworkMessage(NetworkMessageType.REDO, actionToRedo);
-            string json = CanvasDataModelSerializer.SerializeNetworkMessage(msg);
+            string json = CanvasSerializer.SerializeNetworkMessage(msg);
             NetworkMock.SendMessage(_hostIp, json);
         }
     }
@@ -98,7 +98,7 @@ public class ClientViewModel : CanvasViewModel
 
     public void ProcessIncomingMessage(string json)
     {
-        NetworkMessage? msg = CanvasDataModelSerializer.DeserializeNetworkMessage(json);
+        NetworkMessage? msg = CanvasSerializer.DeserializeNetworkMessage(json);
         if (msg == null)
         {
             return;

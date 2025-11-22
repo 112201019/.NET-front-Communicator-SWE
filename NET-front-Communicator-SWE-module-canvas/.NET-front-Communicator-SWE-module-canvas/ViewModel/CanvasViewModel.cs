@@ -5,7 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using CanvasDataModel;
+using Communicator.Canvas;
 using Microsoft.Win32;
 
 namespace ViewModel;
@@ -187,6 +187,13 @@ public class CanvasViewModel : INotifyPropertyChanged
         }
     }
     // --- Core Logic ---
+    // New property to toggle the side panel
+    private bool _isAnalysisVisible = false;
+    public bool IsAnalysisVisible
+    {
+        get => _isAnalysisVisible;
+        set { _isAnalysisVisible = value; OnPropertyChanged(); }
+    }
 
     /// <summary>
     /// Updates the local dictionary with a new/modified shape.
@@ -387,6 +394,11 @@ public class CanvasViewModel : INotifyPropertyChanged
 
     public void TrackPoint(Point point)
     {
+        // --- FIX: Clamp point to CanvasBounds to prevent drawing out of bounds ---
+        int x = Math.Max(CanvasBounds.Left, Math.Min(point.X, CanvasBounds.Right));
+        int y = Math.Max(CanvasBounds.Top, Math.Min(point.Y, CanvasBounds.Bottom));
+        Point clampedPoint = new Point(x, y);
+        // ------------------------------------------------------------------------
         if (_isMovingShape && SelectedShape != null && _originalShapeForMove != null)
         {
             Point offset = new Point(point.X - _moveStartPoint.X, point.Y - _moveStartPoint.Y);
@@ -502,13 +514,13 @@ public class CanvasViewModel : INotifyPropertyChanged
         CommitModification(); // Ensure any pending edits are saved first
 
         // 1. Serialize Current Shape
-        string inputJson = CanvasDataModelSerializer.SerializeShapeManual(SelectedShape);
+        string inputJson = CanvasSerializer.SerializeShapeManual(SelectedShape);
 
         // 2. Call the Black Box Function
         string outputJson = ProcessingService.RegularizeShape(inputJson);
 
         // 3. Deserialize
-        IShape? regularizedShape = CanvasDataModelSerializer.DeserializeShapeManual(outputJson);
+        IShape? regularizedShape = CanvasSerializer.DeserializeShapeManual(outputJson);
 
         if (regularizedShape != null)
         {
@@ -527,13 +539,13 @@ public class CanvasViewModel : INotifyPropertyChanged
     // -------------------------------
 
     // --- NEW: Analyze Feature ---
+    // --- NEW: Analyze Feature ---
     public void PerformAnalysis(string imagePath)
     {
+        // Toggle visibility automatically
+        IsAnalysisVisible = true;
         AnalysisResult = "Analyzing...";
-
-        // Call the Black Box Function
         string result = ProcessingService.AnalyzeCanvasImage(imagePath);
-
         AnalysisResult = result;
     }
     // ----------------------------
@@ -576,7 +588,7 @@ public class CanvasViewModel : INotifyPropertyChanged
         {
             try
             {
-                string json = CanvasDataModelSerializer.SerializeShapesDictionary(_shapes);
+                string json = CanvasSerializer.SerializeShapesDictionary(_shapes);
                 File.WriteAllText(saveDialog.FileName, json);
                 Console.WriteLine($"[Host] Shapes saved to {saveDialog.FileName}");
             }
@@ -588,7 +600,7 @@ public class CanvasViewModel : INotifyPropertyChanged
     {
         try
         {
-            Dictionary<string, IShape> loadedShapes = CanvasDataModelSerializer.DeserializeShapesDictionary(jsonDictionary);
+            Dictionary<string, IShape> loadedShapes = CanvasSerializer.DeserializeShapesDictionary(jsonDictionary);
             if (loadedShapes != null)
             {
                 _shapes = loadedShapes;

@@ -1,6 +1,6 @@
 ﻿using System; // <-- ADDED for Guid
 
-namespace CanvasDataModel;
+namespace Communicator.Canvas;
 
 /// <summary>
 /// Represents a single undo-able/redo-able action on the canvas.
