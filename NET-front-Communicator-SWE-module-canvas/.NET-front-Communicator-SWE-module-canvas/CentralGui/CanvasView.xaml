@@ -109,6 +109,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock x:Name="HeaderLabel" Grid.Row="0" FontWeight="Bold" Padding="5" Background="#DDD"/>
@@ -121,6 +122,7 @@
 
             <Grid HorizontalAlignment="Center">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
@@ -171,6 +173,21 @@
                             <Path Fill="#333" Data="M1,21H23L12,2L1,21M12,4.6L19.5,19H4.5L12,4.6Z" />
                         </Viewbox>
                     </Button>
+                </StackPanel>
+
+                <Separator Grid.Column="1" Margin="4,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="BtnRegularize" Style="{StaticResource ToolButtonWithLabel}" Click="BtnRegularize_Click" ToolTip="Regularize">
+                        <StackPanel>
+                            <TextBlock Text="⚡" FontSize="14" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="BtnAnalyze" Style="{StaticResource ToolButtonWithLabel}" Click="BtnAnalyze_Click" ToolTip="Analyze Canvas">
+                        <StackPanel>
+                            <TextBlock Text="🔍" FontSize="14" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                     <Button x:Name="BtnSnapshot" Style="{StaticResource ToolButtonWithLabel}" Click="BtnSnapshot_Click" ToolTip="Snapshot">
                         <Viewbox Width="18" Height="18">
                             <Path Fill="#333" Data="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z" />
@@ -178,9 +195,9 @@
                     </Button>
                 </StackPanel>
 
-                <Separator Grid.Column="1" Margin="4,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
+                <Separator Grid.Column="3" Margin="4,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                     <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="4,0,8,0">
                         <TextBlock Text="Thickness" FontSize="9" Foreground="#666" HorizontalAlignment="Center" Margin="0,0,0,2"/>
                         <Slider x:Name="ThicknessSlider"
@@ -239,10 +256,6 @@
                             </WrapPanel>
                         </Border>
                     </Popup>
-                </StackPanel>
-
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Separator Margin="4,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
 
                     <Button x:Name="BtnDelete" Style="{StaticResource ToolbarButton}" Click="BtnDelete_Click" ToolTip="Delete (Del)">
                         <Viewbox Width="18" Height="18">
@@ -278,5 +291,20 @@
                 <Canvas x:Name="DrawArea" Width="1600" Height="900" Background="Transparent"/>
             </Border>
         </Viewbox>
+
+        <!-- NEW: Analysis Box -->
+        <Border Grid.Row="3" Background="#EEE" BorderBrush="#CCC" BorderThickness="0,1,0,0" Padding="10">
+            <StackPanel>
+                <TextBlock Text="Canvas Analysis:" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBox Text="{Binding AnalysisResult, Mode=OneWay}" 
+                         IsReadOnly="True" 
+                         Height="60" 
+                         TextWrapping="Wrap" 
+                         VerticalScrollBarVisibility="Auto"
+                         Background="White"
+                         Padding="5"/>
+            </StackPanel>
+        </Border>
+
     </Grid>
 </UserControl>

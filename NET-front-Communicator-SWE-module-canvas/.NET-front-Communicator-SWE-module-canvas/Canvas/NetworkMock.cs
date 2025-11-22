@@ -25,7 +25,7 @@ public static class NetworkMock
     public static void Broadcast(List<string> clientIps, string jsonMessage)
     {
         Console.WriteLine($"[Network] Broadcasting");
-        foreach (var ip in clientIps)
+        foreach (string ip in clientIps)
         {
             SendMessage(ip, jsonMessage);
         }

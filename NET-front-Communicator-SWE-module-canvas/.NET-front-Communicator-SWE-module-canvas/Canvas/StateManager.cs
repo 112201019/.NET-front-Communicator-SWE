@@ -3,10 +3,25 @@ using System.Collections.Generic;
 
 namespace CanvasDataModel;
 
+/// <summary>
+/// Represents a node in the Undo/Redo history chain.
+/// Implements a **Doubly Linked List** node structure.
+/// </summary>
 public class ActionNode
 {
+    /// <summary>
+    /// The action data stored in this node (The Command).
+    /// </summary>
     public CanvasAction Action { get; }
+
+    /// <summary>
+    /// Reference to the previous action (Undo direction).
+    /// </summary>
     public ActionNode? Prev { get; set; }
+
+    /// <summary>
+    /// Reference to the next action (Redo direction).
+    /// </summary>
     public ActionNode? Next { get; set; }
 
     public ActionNode(CanvasAction action)
@@ -21,6 +36,10 @@ public class SerializedActionStack
     public int CurrentIndex { get; set; } = -1;
 }
 
+/// <summary>
+/// Manages the application state history.
+/// Implements the **Command/Memento Pattern** logic using a linear history stack.
+/// </summary>
 public class StateManager
 {
     private ActionNode? _current;
@@ -28,26 +47,41 @@ public class StateManager
 
     public StateManager()
     {
+        // Sentinel node acting as the "Initial State" before any actions.
         _initial = new ActionNode(new CanvasAction(CanvasActionType.Initial, null, null));
         _current = _initial;
     }
 
+    /// <summary>
+    /// Adds a new action to the history.
+    /// This invalidates any existing "Redo" history (branching history is not supported).
+    /// </summary>
+    /// <param name="action">The action to record.</param>
     public void AddAction(CanvasAction action)
     {
         var node = new ActionNode(action);
 
         if (_current != null)
         {
+            // Sever the link to any future actions (clearing Redo stack)
             _current.Next = null;
+
+            // Link new node
             node.Prev = _current;
             _current.Next = node;
         }
 
+        // Advance pointer
         _current = node;
     }
 
+    /// <summary>
+    /// Moves the state pointer backward one step.
+    /// </summary>
+    /// <returns>The action that was undone, or null if at start.</returns>
     public CanvasAction? Undo()
     {
+        // Cannot undo the initial sentinel node
         if (_current?.Prev != null)
         {
             CanvasAction actionToUndo = _current.Action;
@@ -57,6 +91,10 @@ public class StateManager
         return null;
     }
 
+    /// <summary>
+    /// Moves the state pointer forward one step.
+    /// </summary>
+    /// <returns>The action that was redone, or null if at end.</returns>
     public CanvasAction? Redo()
     {
         if (_current?.Next != null)
@@ -67,11 +105,9 @@ public class StateManager
         return null;
     }
 
-    // --- NEW: PEEK METHODS FOR CLIENT PREDICTION ---
-
     /// <summary>
-    /// Returns the action that *would* be undone if Undo() was called, 
-    /// without changing the state.
+    /// Peeks at the action that would be undone, without modifying state.
+    /// Useful for Client-Side Prediction checks.
     /// </summary>
     public CanvasAction? PeekUndo()
     {
@@ -83,8 +119,7 @@ public class StateManager
     }
 
     /// <summary>
-    /// Returns the action that *would* be redone if Redo() was called,
-    /// without changing the state.
+    /// Peeks at the action that would be redone, without modifying state.
     /// </summary>
     public CanvasAction? PeekRedo()
     {
@@ -94,9 +129,6 @@ public class StateManager
         }
         return null;
     }
-    // --- END NEW ---
-
-    public CanvasAction? CurrentAction => _current?.Action;
 
     public SerializedActionStack ExportState()
     {

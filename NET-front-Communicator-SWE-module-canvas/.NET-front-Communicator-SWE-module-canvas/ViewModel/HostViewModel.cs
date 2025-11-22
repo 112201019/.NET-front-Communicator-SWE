@@ -21,7 +21,11 @@ public class HostViewModel : CanvasViewModel
 
     public override void CommitModification()
     {
-        if (_suppressCommit) return;
+        if (_suppressCommit)
+        {
+            return;
+        }
+
         base.CommitModification();
     }
 
@@ -144,7 +148,10 @@ public class HostViewModel : CanvasViewModel
     public void ProcessIncomingMessage(string json)
     {
         NetworkMessage? msg = CanvasDataModelSerializer.DeserializeNetworkMessage(json);
-        if (msg == null) return;
+        if (msg == null)
+        {
+            return;
+        }
 
         // Host usually only receives its own broadcasts in this setup, or client actions
         // Logic kept for Client Actions
@@ -155,7 +162,11 @@ public class HostViewModel : CanvasViewModel
                 CanvasAction action = msg.Action;
                 if (ValidateAction(action))
                 {
-                    if (action.NewShape != null) UpdateShapeFromNetwork(action.NewShape);
+                    if (action.NewShape != null)
+                    {
+                        UpdateShapeFromNetwork(action.NewShape);
+                    }
+
                     RaiseRequestRedraw();
                     NetworkMock.Broadcast(_clientIps, json);
                 }
@@ -170,7 +181,10 @@ public class HostViewModel : CanvasViewModel
     private bool ValidateAction(CanvasAction action)
     {
         string shapeId = action.NewShape?.ShapeId ?? action.PrevShape?.ShapeId ?? "";
-        if (string.IsNullOrEmpty(shapeId)) return false;
+        if (string.IsNullOrEmpty(shapeId))
+        {
+            return false;
+        }
 
         switch (action.ActionType)
         {
@@ -180,14 +194,23 @@ public class HostViewModel : CanvasViewModel
             case CanvasActionType.Delete:
             case CanvasActionType.Modify:
             case CanvasActionType.Resurrect:
-                if (!_shapes.ContainsKey(shapeId)) return false;
+                if (!_shapes.ContainsKey(shapeId))
+                {
+                    return false;
+                }
 
                 IShape currentHostShape = _shapes[shapeId];
                 IShape? incomingPrevShape = action.PrevShape;
 
-                if (incomingPrevShape == null) return false;
+                if (incomingPrevShape == null)
+                {
+                    return false;
+                }
 
-                if (currentHostShape.ShapeId != incomingPrevShape.ShapeId) return false;
+                if (currentHostShape.ShapeId != incomingPrevShape.ShapeId)
+                {
+                    return false;
+                }
 
                 if (currentHostShape.LastModifiedBy != incomingPrevShape.LastModifiedBy)
                 {

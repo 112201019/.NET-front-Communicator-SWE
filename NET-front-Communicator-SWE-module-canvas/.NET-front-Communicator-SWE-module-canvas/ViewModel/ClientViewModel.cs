@@ -21,7 +21,11 @@ public class ClientViewModel : CanvasViewModel
 
     public override void CommitModification()
     {
-        if (_suppressCommit) return;
+        if (_suppressCommit)
+        {
+            return;
+        }
+
         base.CommitModification();
     }
 
@@ -95,7 +99,10 @@ public class ClientViewModel : CanvasViewModel
     public void ProcessIncomingMessage(string json)
     {
         NetworkMessage? msg = CanvasDataModelSerializer.DeserializeNetworkMessage(json);
-        if (msg == null) return;
+        if (msg == null)
+        {
+            return;
+        }
 
         // --- HANDLE RESTORE ---
         if (msg.MessageType == NetworkMessageType.RESTORE)
@@ -110,7 +117,10 @@ public class ClientViewModel : CanvasViewModel
         // ---------------------
 
         CanvasAction action = msg.Action;
-        if (action == null) return; // Safety
+        if (action == null)
+        {
+            return; // Safety
+        }
 
         bool isMyAction = false;
 
@@ -122,13 +132,19 @@ public class ClientViewModel : CanvasViewModel
         {
             if (msg.MessageType == NetworkMessageType.UNDO)
             {
-                var localUndo = _stateManager.PeekUndo();
-                if (localUndo != null && localUndo.ActionId == action.ActionId) isMyAction = true;
+                CanvasAction? localUndo = _stateManager.PeekUndo();
+                if (localUndo != null && localUndo.ActionId == action.ActionId)
+                {
+                    isMyAction = true;
+                }
             }
             else if (msg.MessageType == NetworkMessageType.REDO)
             {
-                var localRedo = _stateManager.PeekRedo();
-                if (localRedo != null && localRedo.ActionId == action.ActionId) isMyAction = true;
+                CanvasAction? localRedo = _stateManager.PeekRedo();
+                if (localRedo != null && localRedo.ActionId == action.ActionId)
+                {
+                    isMyAction = true;
+                }
             }
         }
 
@@ -145,7 +161,7 @@ public class ClientViewModel : CanvasViewModel
         if (isMyAction)
         {
             ApplyActionLocally(action);
-            var ghost = GhostShapes.FirstOrDefault(g => g.ShapeId == action.NewShape?.ShapeId);
+            IShape? ghost = GhostShapes.FirstOrDefault(g => g.ShapeId == action.NewShape?.ShapeId);
             if (ghost != null)
             {
                 GhostShapes.Remove(ghost);

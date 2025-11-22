@@ -53,39 +53,37 @@ public static class CanvasDataModelSerializer
     /// <returns>A JSON string representing the shape.</returns>
     public static string SerializeShapeManual(IShape shape)
     {
-        using (var stream = new MemoryStream())
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            writer.WriteStartObject();
+
+            writer.WriteString("ShapeId", shape.ShapeId);
+            writer.WriteString("Type", shape.Type.ToString());
+
+            writer.WritePropertyName("Points");
+            writer.WriteStartArray();
+            foreach (Point point in shape.Points)
             {
                 writer.WriteStartObject();
-
-                writer.WriteString("ShapeId", shape.ShapeId);
-                writer.WriteString("Type", shape.Type.ToString());
-
-                writer.WritePropertyName("Points");
-                writer.WriteStartArray();
-                foreach (Point point in shape.Points)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteNumber("X", point.X);
-                    writer.WriteNumber("Y", point.Y);
-                    writer.WriteEndObject();
-                }
-                writer.WriteEndArray();
-
-                writer.WriteString("Color", $"#{shape.Color.ToArgb():X8}");
-                writer.WriteNumber("Thickness", shape.Thickness);
-
-                // --- MODIFIED PROPERTIES ---
-                writer.WriteString("CreatedBy", shape.CreatedBy);
-                writer.WriteString("LastModifiedBy", shape.LastModifiedBy);
-                writer.WriteBoolean("IsDeleted", shape.IsDeleted);
-                // --- UserId REMOVED ---
-
+                writer.WriteNumber("X", point.X);
+                writer.WriteNumber("Y", point.Y);
                 writer.WriteEndObject();
             }
-            return Encoding.UTF8.GetString(stream.ToArray());
+            writer.WriteEndArray();
+
+            writer.WriteString("Color", $"#{shape.Color.ToArgb():X8}");
+            writer.WriteNumber("Thickness", shape.Thickness);
+
+            // --- MODIFIED PROPERTIES ---
+            writer.WriteString("CreatedBy", shape.CreatedBy);
+            writer.WriteString("LastModifiedBy", shape.LastModifiedBy);
+            writer.WriteBoolean("IsDeleted", shape.IsDeleted);
+            // --- UserId REMOVED ---
+
+            writer.WriteEndObject();
         }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     /// <summary>
@@ -124,7 +122,7 @@ public static class CanvasDataModelSerializer
         JsonArray? pointsArray = doc["Points"]?.AsArray();
         if (pointsArray != null)
         {
-            foreach (var pointNode in pointsArray)
+            foreach (JsonNode? pointNode in pointsArray)
             {
                 if (pointNode != null)
                 {
@@ -165,44 +163,42 @@ public static class CanvasDataModelSerializer
     /// </summary>
     public static string SerializeActionManual(CanvasAction action)
     {
-        using (var stream = new MemoryStream())
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            writer.WriteStartObject();
+
+            // --- ADDED ---
+            writer.WriteString("ActionId", action.ActionId);
+            // --- END ADDED ---
+
+            writer.WriteString("ActionType", action.ActionType.ToString());
+
+            if (action.PrevShape != null)
             {
-                writer.WriteStartObject();
-
-                // --- ADDED ---
-                writer.WriteString("ActionId", action.ActionId);
-                // --- END ADDED ---
-
-                writer.WriteString("ActionType", action.ActionType.ToString());
-
-                if (action.PrevShape != null)
-                {
-                    string prevShapeJson = SerializeShapeManual(action.PrevShape);
-                    writer.WritePropertyName("Prev");
-                    writer.WriteRawValue(prevShapeJson);
-                }
-                else
-                {
-                    writer.WriteNull("Prev");
-                }
-
-                if (action.NewShape != null)
-                {
-                    string newShapeJson = SerializeShapeManual(action.NewShape);
-                    writer.WritePropertyName("Next");
-                    writer.WriteRawValue(newShapeJson);
-                }
-                else
-                {
-                    writer.WriteNull("Next");
-                }
-
-                writer.WriteEndObject();
+                string prevShapeJson = SerializeShapeManual(action.PrevShape);
+                writer.WritePropertyName("Prev");
+                writer.WriteRawValue(prevShapeJson);
             }
-            return Encoding.UTF8.GetString(stream.ToArray());
+            else
+            {
+                writer.WriteNull("Prev");
+            }
+
+            if (action.NewShape != null)
+            {
+                string newShapeJson = SerializeShapeManual(action.NewShape);
+                writer.WritePropertyName("Next");
+                writer.WriteRawValue(newShapeJson);
+            }
+            else
+            {
+                writer.WriteNull("Next");
+            }
+
+            writer.WriteEndObject();
         }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     /// <summary>
@@ -258,10 +254,8 @@ public static class CanvasDataModelSerializer
     {
         // This is necessary because the shape serialization already wrote its own object { }
         // We parse it and write its contents directly to the current action writer stream.
-        using (JsonDocument document = JsonDocument.Parse(rawJson))
-        {
-            document.RootElement.WriteTo(writer);
-        }
+        using JsonDocument document = JsonDocument.Parse(rawJson);
+        document.RootElement.WriteTo(writer);
     }
 
     // =========================================================================
@@ -299,27 +293,25 @@ public static class CanvasDataModelSerializer
 
         // --- REVISED, MANUAL APPROACH (More robust) ---
 
-        using (var stream = new MemoryStream())
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            writer.WriteStartObject();
+            writer.WriteNumber("CurrentIndex", stackDto.CurrentIndex);
+
+            writer.WritePropertyName("AllActions");
+            writer.WriteStartArray();
+            foreach (CanvasAction action in stackDto.AllActions)
             {
-                writer.WriteStartObject();
-                writer.WriteNumber("CurrentIndex", stackDto.CurrentIndex);
-
-                writer.WritePropertyName("AllActions");
-                writer.WriteStartArray();
-                foreach (var action in stackDto.AllActions)
-                {
-                    // Call our manual action serializer for each action
-                    string actionJson = SerializeActionManual(action);
-                    writer.WriteRawValue(actionJson);
-                }
-                writer.WriteEndArray();
-
-                writer.WriteEndObject();
+                // Call our manual action serializer for each action
+                string actionJson = SerializeActionManual(action);
+                writer.WriteRawValue(actionJson);
             }
-            return Encoding.UTF8.GetString(stream.ToArray());
+            writer.WriteEndArray();
+
+            writer.WriteEndObject();
         }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     /// <summary>
@@ -338,18 +330,20 @@ public static class CanvasDataModelSerializer
             return null;
         }
 
-        var dto = new SerializedActionStack();
-        dto.CurrentIndex = doc["CurrentIndex"]?.GetValue<int>() ?? -1;
+        var dto = new SerializedActionStack
+        {
+            CurrentIndex = doc["CurrentIndex"]?.GetValue<int>() ?? -1
+        };
 
         JsonArray? actionsArray = doc["AllActions"]?.AsArray();
         if (actionsArray != null)
         {
-            foreach (var actionNode in actionsArray)
+            foreach (JsonNode? actionNode in actionsArray)
             {
                 if (actionNode != null)
                 {
                     // Call our manual action deserializer
-                    var action = DeserializeActionManual(actionNode.ToJsonString());
+                    CanvasAction? action = DeserializeActionManual(actionNode.ToJsonString());
                     if (action != null)
                     {
                         dto.AllActions.Add(action);
@@ -369,32 +363,30 @@ public static class CanvasDataModelSerializer
     /// </summary>
     public static string SerializeShapesDictionary(Dictionary<string, IShape> dictionary)
     {
-        using (var stream = new MemoryStream())
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            // ---
+            // --- MAJOR LOGIC CHANGE ---
+            // ---
+            // The root is an object
+            writer.WriteStartObject();
+
+            foreach (KeyValuePair<string, IShape> kvp in dictionary)
             {
-                // ---
-                // --- MAJOR LOGIC CHANGE ---
-                // ---
-                // The root is an object
-                writer.WriteStartObject();
+                // The Key (e.g., "shape-id-1") is the property name
+                writer.WritePropertyName(kvp.Key);
 
-                foreach (var kvp in dictionary)
-                {
-                    // The Key (e.g., "shape-id-1") is the property name
-                    writer.WritePropertyName(kvp.Key);
-
-                    // The Value is the serialized shape object directly
-                    string shapeJson = SerializeShapeManual(kvp.Value);
-                    writer.WriteRawValue(shapeJson);
-                }
-
-                writer.WriteEndObject();
-                // ---
-                // ---
+                // The Value is the serialized shape object directly
+                string shapeJson = SerializeShapeManual(kvp.Value);
+                writer.WriteRawValue(shapeJson);
             }
-            return Encoding.UTF8.GetString(stream.ToArray());
+
+            writer.WriteEndObject();
+            // ---
+            // ---
         }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     /// <summary>
@@ -420,12 +412,15 @@ public static class CanvasDataModelSerializer
         // ---
         if (doc is JsonObject rootObject)
         {
-            foreach (var property in rootObject)
+            foreach (KeyValuePair<string, JsonNode?> property in rootObject)
             {
                 string shapeId = property.Key;
                 JsonNode? shapeNode = property.Value; // The value *is* the shape node
 
-                if (shapeNode == null) continue;
+                if (shapeNode == null)
+                {
+                    continue;
+                }
 
                 IShape? shape = DeserializeShapeManual(shapeNode.ToJsonString());
 
@@ -454,42 +449,48 @@ public static class CanvasDataModelSerializer
 
     public static string SerializeNetworkMessage(NetworkMessage message)
     {
-        using (var stream = new MemoryStream())
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = false }))
         {
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = false }))
+            writer.WriteStartObject();
+
+            writer.WriteString("MessageType", message.MessageType.ToString());
+
+            if (message.Action != null)
             {
-                writer.WriteStartObject();
-
-                writer.WriteString("MessageType", message.MessageType.ToString());
-
-                if (message.Action != null)
-                {
-                    writer.WritePropertyName("Action");
-                    string actionJson = SerializeActionManual(message.Action);
-                    writer.WriteRawValue(actionJson);
-                }
-
-                if (!string.IsNullOrEmpty(message.Payload))
-                {
-                    writer.WriteString("Payload", message.Payload);
-                }
-
-                writer.WriteEndObject();
+                writer.WritePropertyName("Action");
+                string actionJson = SerializeActionManual(message.Action);
+                writer.WriteRawValue(actionJson);
             }
-            return Encoding.UTF8.GetString(stream.ToArray());
+
+            if (!string.IsNullOrEmpty(message.Payload))
+            {
+                writer.WriteString("Payload", message.Payload);
+            }
+
+            writer.WriteEndObject();
         }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     public static NetworkMessage? DeserializeNetworkMessage(string json)
     {
-        if (string.IsNullOrEmpty(json)) return null;
+        if (string.IsNullOrEmpty(json))
+        {
+            return null;
+        }
 
         JsonNode? doc = JsonNode.Parse(json);
-        if (doc == null) return null;
+        if (doc == null)
+        {
+            return null;
+        }
 
         string? messageTypeName = doc["MessageType"]?.GetValue<string>();
         if (!Enum.TryParse<NetworkMessageType>(messageTypeName, out NetworkMessageType messageType))
+        {
             return null;
+        }
 
         CanvasAction? action = null;
         JsonNode? actionNode = doc["Action"];

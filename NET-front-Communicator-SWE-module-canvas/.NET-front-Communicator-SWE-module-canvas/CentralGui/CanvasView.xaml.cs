@@ -66,7 +66,6 @@ public partial class CanvasView : UserControl
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
-
         if (_vm == null) { return; }
 
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Z)
@@ -84,26 +83,78 @@ public partial class CanvasView : UserControl
             _vm.DeleteSelectedShape();
             e.Handled = true;
         }
-        else if (e.Key == Key.T) // Save (Host Only)
+        else if (e.Key == Key.T)
         {
             if (_vm.IsHost) { _vm.SaveShapes(); }
         }
-        else if (e.Key == Key.S) // Snapshot
+        else if (e.Key == Key.S)
         {
             SaveCanvasSnapshot();
         }
     }
-    // --- SNAPSHOT FEATURE ---
+
     private void BtnSnapshot_Click(object sender, RoutedEventArgs e)
     {
         SaveCanvasSnapshot();
     }
 
+    // --- NEW HANDLERS ---
+
+    private void BtnRegularize_Click(object sender, RoutedEventArgs e)
+    {
+        _vm?.RegularizeSelectedShape();
+    }
+
+    private void BtnAnalyze_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm == null) return;
+
+        // 1. Save Current Canvas to a temp file silently
+        string tempPath = System.IO.Path.GetTempFileName() + ".png";
+
+        try
+        {
+            SaveCanvasToPath(tempPath);
+            // 2. Trigger VM analysis
+            _vm.PerformAnalysis(tempPath);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to capture canvas for analysis: {ex.Message}");
+        }
+    }
+
+    private void SaveCanvasToPath(string filePath)
+    {
+        // Render the CanvasBorder 
+        FrameworkElement elementToRender = CanvasBorder;
+
+        RenderTargetBitmap rtb = new RenderTargetBitmap(
+            (int)elementToRender.ActualWidth,
+            (int)elementToRender.ActualHeight,
+            96d,
+            96d,
+            PixelFormats.Pbgra32
+        );
+
+        rtb.Render(elementToRender);
+
+        PngBitmapEncoder pngEncoder = new PngBitmapEncoder();
+        pngEncoder.Frames.Add(BitmapFrame.Create(rtb));
+
+        using (FileStream fs = System.IO.File.OpenWrite(filePath))
+        {
+            pngEncoder.Save(fs);
+        }
+    }
+
+    // --------------------
+
     private void SaveCanvasSnapshot()
     {
         SaveFileDialog dialog = new SaveFileDialog
         {
-            FileName = "screen shot", // Default file name
+            FileName = "screen shot",
             DefaultExt = ".png",
             Filter = "PNG Image (.png)|*.png"
         };
@@ -114,35 +165,7 @@ public partial class CanvasView : UserControl
         {
             try
             {
-                // Render the CanvasBorder (it has the White background)
-                // We use ActualWidth/Height to capture exactly what is visible or the full extent
-                // Note: If the canvas is scrolled/zoomed, this captures the viewport. 
-                // To capture everything, you might need to temporarily resize, but for "Screenshot" this is usually correct.
-
-                FrameworkElement elementToRender = CanvasBorder;
-
-                // Create the bitmap with the element's dimensions
-                // Use 96 DPI for standard screen resolution
-                RenderTargetBitmap rtb = new RenderTargetBitmap(
-                    (int)elementToRender.ActualWidth,
-                    (int)elementToRender.ActualHeight,
-                    96d,
-                    96d,
-                    PixelFormats.Pbgra32
-                );
-
-                rtb.Render(elementToRender);
-
-                // Encode as PNG
-                PngBitmapEncoder pngEncoder = new PngBitmapEncoder();
-                pngEncoder.Frames.Add(BitmapFrame.Create(rtb));
-
-                // Save to file
-                using (FileStream fs = System.IO.File.OpenWrite(dialog.FileName))
-                {
-                    pngEncoder.Save(fs);
-                }
-
+                SaveCanvasToPath(dialog.FileName);
                 Console.WriteLine($"[GUI] Snapshot saved to {dialog.FileName}");
             }
             catch (Exception ex)
@@ -151,7 +174,6 @@ public partial class CanvasView : UserControl
             }
         }
     }
-    // ------------------------
 
     private void InitializeViewModelConnections()
     {
@@ -181,16 +203,13 @@ public partial class CanvasView : UserControl
         var visibleShapes = _vm._shapes.Values.Where(shape => !shape.IsDeleted).ToList();
         var ghosts = _vm.GhostShapes.ToList();
 
-        DrawArea.Children.Clear();
+        // Use the Visitor Pattern to render
+        ShapeRenderer.RenderAll(DrawArea, visibleShapes);
 
-        foreach (IShape shape in visibleShapes)
-        {
-            ShapeRenderer.Render(DrawArea, shape);
-        }
-
+        // Render Ghosts (transient shapes)
         foreach (IShape ghost in ghosts)
         {
-            UIElement element = ShapeRenderer.Render(DrawArea, ghost);
+            UIElement? element = ShapeRenderer.Render(DrawArea, ghost);
             if (element != null)
             {
                 element.Opacity = 0.4;
@@ -231,7 +250,6 @@ public partial class CanvasView : UserControl
         }
 
         bool wasMoving = _vm.IsMovingShape;
-        bool wasTracking = _vm._isTracking;
 
         _vm.StopTracking();
         (sender as UIElement)?.ReleaseMouseCapture();
@@ -359,73 +377,40 @@ public partial class CanvasView : UserControl
 
     private void BtnSelect_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm != null)
-        {
-            _vm.CurrentMode = CanvasViewModel.DrawingMode.Select;
-        }
+        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.Select;
     }
     private void BtnFreehand_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm != null)
-        {
-            _vm.CurrentMode = CanvasViewModel.DrawingMode.FreeHand;
-        }
+        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.FreeHand;
     }
     private void BtnLine_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm != null)
-        {
-            _vm.CurrentMode = CanvasViewModel.DrawingMode.StraightLine;
-        }
+        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.StraightLine;
     }
     private void BtnRectangle_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm != null)
-        {
-            _vm.CurrentMode = CanvasViewModel.DrawingMode.Rectangle;
-        }
+        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.Rectangle;
     }
     private void BtnTriangle_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm != null)
-        {
-            _vm.CurrentMode = CanvasViewModel.DrawingMode.TriangleShape;
-        }
+        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.TriangleShape;
     }
     private void BtnEllipse_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm != null)
-        {
-            _vm.CurrentMode = CanvasViewModel.DrawingMode.EllipseShape;
-        }
+        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.EllipseShape;
     }
-    private void BtnUndo_Click(object sender, RoutedEventArgs e)
-    {
-        _vm?.Undo();
-    }
+    private void BtnUndo_Click(object sender, RoutedEventArgs e) { _vm?.Undo(); }
     private void BtnRedo_Click(object sender, RoutedEventArgs e) { _vm?.Redo(); }
-
-    // Save logic
     private void BtnSave_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm != null && _vm.IsHost)
-        {
-            _vm.SaveShapes();
-        }
+        if (_vm != null && _vm.IsHost) _vm.SaveShapes();
     }
-
-    // Add Restore Handler
     private void BtnRestore_Click(object sender, RoutedEventArgs e)
     {
-        if (_vm is HostViewModel hostVm)
-        {
-            hostVm.RestoreShapes();
-        }
+        if (_vm is HostViewModel hostVm) hostVm.RestoreShapes();
     }
     private void BtnDelete_Click(object sender, RoutedEventArgs e) { _vm?.DeleteSelectedShape(); }
-
     private void CurrentColorButton_Click(object sender, RoutedEventArgs e) { ColorPopup.IsOpen = true; }
-
     private void ColorButton_Click(object sender, RoutedEventArgs e)
     {
         if (_vm == null) { return; }
