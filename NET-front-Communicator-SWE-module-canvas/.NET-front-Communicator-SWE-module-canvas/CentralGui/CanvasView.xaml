@@ -215,7 +215,7 @@
                         </Button>
                         <Button x:Name="BtnSnapshot" Style="{StaticResource ToolButtonWithLabel}" Click="BtnSnapshot_Click" ToolTip="Snapshot">
                             <Viewbox Width="18" Height="18">
-                                <Path Fill="#333" Data="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z" />
+                                <Path Fill="#333" Data="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z" />
                             </Viewbox>
                         </Button>
                     </StackPanel>
@@ -284,9 +284,11 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="2" Margin="10" ClipToBounds="True">
+            <ScrollViewer Grid.Row="2" Margin="10" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <!-- ADDED ClipToBounds="True" AND Explicit Width/Height to DrawArea -->
                 <Border x:Name="CanvasBorder" BorderBrush="#FF888888" BorderThickness="1" Background="White" 
-                        Width="1600" Height="900" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        Width="1600" Height="900" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        ClipToBounds="True">
                     <Border.RenderTransform>
                         <TransformGroup>
                             <ScaleTransform x:Name="CanvasScaleTransform" ScaleX="1" ScaleY="1" />
@@ -296,9 +298,11 @@
                     <Border.Effect>
                         <DropShadowEffect ShadowDepth="4" Color="Black" Opacity="0.3" BlurRadius="10"/>
                     </Border.Effect>
-                    <Canvas x:Name="DrawArea" Background="Transparent"/>
+                    
+                    <!-- Explicit Width/Height ensures vm.CanvasBounds calculates correctly -->
+                    <Canvas x:Name="DrawArea" Width="1600" Height="900" Background="Transparent"/>
                 </Border>
-            </Grid>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </UserControl>

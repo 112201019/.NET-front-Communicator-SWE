@@ -21,8 +21,12 @@ public partial class CanvasView : UserControl
     private CanvasViewModel? _vm;
     private UIElement? _currentPreviewElement = null;
     private Rectangle? _selectionBox = null;
+    
+    // --- FIXED: Panning State ---
     private bool _isPanning = false;
-    private Point _panStartPoint;
+    private Point _panLastPosition; // Tracks position relative to the static View, not the moving Canvas
+    // ----------------------------
+
     private const double ZOOM_FACTOR = 1.1;
     private const double MAX_ZOOM = 5.0;
     private const double MIN_ZOOM = 0.5;
@@ -44,6 +48,15 @@ public partial class CanvasView : UserControl
         ThicknessSlider.PreviewMouseLeftButtonUp += (s, e) =>
         {
             _vm?.CommitModification();
+        };
+
+        // Keep bounds updated on resize
+        this.SizeChanged += (s, e) => 
+        {
+            if (_vm != null && CanvasBorder.ActualWidth > 0 && CanvasBorder.ActualHeight > 0)
+            {
+                _vm.CanvasBounds = new Drawing.Rectangle(0, 0, (int)CanvasBorder.ActualWidth, (int)CanvasBorder.ActualHeight);
+            }
         };
     }
 
@@ -98,8 +111,6 @@ public partial class CanvasView : UserControl
         SaveCanvasSnapshot();
     }
 
-    // --- NEW HANDLERS ---
-
     private void BtnRegularize_Click(object sender, RoutedEventArgs e)
     {
         _vm?.RegularizeSelectedShape();
@@ -109,13 +120,11 @@ public partial class CanvasView : UserControl
     {
         if (_vm == null) return;
 
-        // 1. Save Current Canvas to a temp file silently
         string tempPath = System.IO.Path.GetTempFileName() + ".png";
 
         try
         {
             SaveCanvasToPath(tempPath);
-            // 2. Trigger VM analysis
             _vm.PerformAnalysis(tempPath);
         }
         catch (Exception ex)
@@ -129,8 +138,10 @@ public partial class CanvasView : UserControl
     }
     private void SaveCanvasToPath(string filePath)
     {
-        // Render the CanvasBorder 
         FrameworkElement elementToRender = CanvasBorder;
+
+        // Force layout update if needed, though ActualWidth usually suffices
+        if (elementToRender.ActualWidth == 0 || elementToRender.ActualHeight == 0) return;
 
         RenderTargetBitmap rtb = new RenderTargetBitmap(
             (int)elementToRender.ActualWidth,
@@ -150,8 +161,6 @@ public partial class CanvasView : UserControl
             pngEncoder.Save(fs);
         }
     }
-
-    // --------------------
 
     private void SaveCanvasSnapshot()
     {
@@ -182,7 +191,11 @@ public partial class CanvasView : UserControl
     {
         if (_vm == null) { return; }
 
-        _vm.CanvasBounds = new Drawing.Rectangle(0, 0, (int)DrawArea.Width, (int)DrawArea.Height);
+        // Initialize bounds with ActualWidth/Height if available, else fall back to Width/Height
+        int w = (int)(CanvasBorder.ActualWidth > 0 ? CanvasBorder.ActualWidth : CanvasBorder.Width);
+        int h = (int)(CanvasBorder.ActualHeight > 0 ? CanvasBorder.ActualHeight : CanvasBorder.Height);
+        
+        _vm.CanvasBounds = new Drawing.Rectangle(0, 0, w, h);
 
         _vm.PropertyChanged += Vm_PropertyChanged;
         _vm.RequestRedraw += () => Dispatcher.Invoke(SyncCanvasState);
@@ -206,10 +219,8 @@ public partial class CanvasView : UserControl
         var visibleShapes = _vm._shapes.Values.Where(shape => !shape.IsDeleted).ToList();
         var ghosts = _vm.GhostShapes.ToList();
 
-        // Use the Visitor Pattern to render
         ShapeRenderer.RenderAll(DrawArea, visibleShapes);
 
-        // Render Ghosts (transient shapes)
         foreach (IShape ghost in ghosts)
         {
             UIElement? element = ShapeRenderer.Render(DrawArea, ghost);
@@ -263,16 +274,23 @@ public partial class CanvasView : UserControl
         }
     }
 
+    // --- FIX: Logic Updated here ---
     private void CanvasBorder_MouseMove(object sender, MouseEventArgs e)
     {
         if (_vm == null) { return; }
 
         if (_isPanning)
         {
-            Point logicalPos = e.GetPosition(DrawArea);
-            Vector delta_logical = logicalPos - _panStartPoint;
-            CanvasTranslateTransform.X += delta_logical.X;
-            CanvasTranslateTransform.Y += delta_logical.Y;
+            // KEY FIX: Use GetPosition(this) instead of GetPosition(DrawArea)
+            // 'this' refers to the UserControl, which is stationary. 
+            // 'DrawArea' moves, which causes the jitter loop.
+            Point currentPos = e.GetPosition(this);
+            Vector delta = currentPos - _panLastPosition;
+
+            CanvasTranslateTransform.X += delta.X;
+            CanvasTranslateTransform.Y += delta.Y;
+
+            _panLastPosition = currentPos;
         }
         else
         {
@@ -305,9 +323,11 @@ public partial class CanvasView : UserControl
     private void CanvasBorder_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         _isPanning = true;
-        _panStartPoint = e.GetPosition(DrawArea);
+        // KEY FIX: Capture position relative to stationary container
+        _panLastPosition = e.GetPosition(this); 
         (sender as UIElement)?.CaptureMouse();
     }
+    // -------------------------------
 
     private void CanvasBorder_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
@@ -377,31 +397,13 @@ public partial class CanvasView : UserControl
             case CanvasViewModel.DrawingMode.TriangleShape: BtnTriangle.Background = selectedBrush; break;
         }
     }
-
-    private void BtnSelect_Click(object sender, RoutedEventArgs e)
-    {
-        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.Select;
-    }
-    private void BtnFreehand_Click(object sender, RoutedEventArgs e)
-    {
-        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.FreeHand;
-    }
-    private void BtnLine_Click(object sender, RoutedEventArgs e)
-    {
-        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.StraightLine;
-    }
-    private void BtnRectangle_Click(object sender, RoutedEventArgs e)
-    {
-        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.Rectangle;
-    }
-    private void BtnTriangle_Click(object sender, RoutedEventArgs e)
-    {
-        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.TriangleShape;
-    }
-    private void BtnEllipse_Click(object sender, RoutedEventArgs e)
-    {
-        if (_vm != null) _vm.CurrentMode = CanvasViewModel.DrawingMode.EllipseShape;
-    }
+    
+    private void BtnSelect_Click(object sender, RoutedEventArgs e) { if(_vm!=null) _vm.CurrentMode = CanvasViewModel.DrawingMode.Select; }
+    private void BtnFreehand_Click(object sender, RoutedEventArgs e) { if(_vm!=null) _vm.CurrentMode = CanvasViewModel.DrawingMode.FreeHand; }
+    private void BtnLine_Click(object sender, RoutedEventArgs e) { if(_vm!=null) _vm.CurrentMode = CanvasViewModel.DrawingMode.StraightLine; }
+    private void BtnRectangle_Click(object sender, RoutedEventArgs e) { if(_vm!=null) _vm.CurrentMode = CanvasViewModel.DrawingMode.Rectangle; }
+    private void BtnTriangle_Click(object sender, RoutedEventArgs e) { if(_vm!=null) _vm.CurrentMode = CanvasViewModel.DrawingMode.TriangleShape; }
+    private void BtnEllipse_Click(object sender, RoutedEventArgs e) { if(_vm!=null) _vm.CurrentMode = CanvasViewModel.DrawingMode.EllipseShape; }
     private void BtnUndo_Click(object sender, RoutedEventArgs e) { _vm?.Undo(); }
     private void BtnRedo_Click(object sender, RoutedEventArgs e) { _vm?.Redo(); }
     private void BtnSave_Click(object sender, RoutedEventArgs e)

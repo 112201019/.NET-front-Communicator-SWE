@@ -394,14 +394,23 @@ public class CanvasViewModel : INotifyPropertyChanged
 
     public void TrackPoint(Point point)
     {
-        // --- FIX: Clamp point to CanvasBounds to prevent drawing out of bounds ---
-        int x = Math.Max(CanvasBounds.Left, Math.Min(point.X, CanvasBounds.Right));
-        int y = Math.Max(CanvasBounds.Top, Math.Min(point.Y, CanvasBounds.Bottom));
+        // --- FIX: Clamp the point to be within the Canvas Bounds ---
+        // This prevents drawing or dragging shapes outside the visible area.
+        int x = point.X;
+        int y = point.Y;
+
+        if (CanvasBounds.Width > 0 && CanvasBounds.Height > 0)
+        {
+            x = Math.Max(CanvasBounds.Left, Math.Min(x, CanvasBounds.Right));
+            y = Math.Max(CanvasBounds.Top, Math.Min(y, CanvasBounds.Bottom));
+        }
+        
         Point clampedPoint = new Point(x, y);
-        // ------------------------------------------------------------------------
+        // -----------------------------------------------------------
+
         if (_isMovingShape && SelectedShape != null && _originalShapeForMove != null)
         {
-            Point offset = new Point(point.X - _moveStartPoint.X, point.Y - _moveStartPoint.Y);
+            Point offset = new Point(clampedPoint.X - _moveStartPoint.X, clampedPoint.Y - _moveStartPoint.Y);
             IShape movedShape = _originalShapeForMove.WithMove(offset, CanvasBounds, CurrentUserId);
             UpdateShapeFromNetwork(movedShape);
             RaiseRequestRedraw();
@@ -410,11 +419,11 @@ public class CanvasViewModel : INotifyPropertyChanged
         {
             if (CurrentMode == DrawingMode.FreeHand)
             {
-                _trackedPoints.Add(point);
+                _trackedPoints.Add(clampedPoint);
             }
             else
             {
-                _trackedPoints[1] = point;
+                _trackedPoints[1] = clampedPoint;
             }
         }
     }
